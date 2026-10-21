@@ -38,7 +38,7 @@ def get_value(key):
             logger.warning(f"GET {key} failed: Key not found")
             return jsonify({'error': 'Key not found'}), 404
 
-@app.route('/<key>', methods=['POST'])
+@app.route('/<key>', methods=['POST', 'PUT'])
 def set_value(key):
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or 'value' not in data:
