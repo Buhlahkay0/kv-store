@@ -31,12 +31,15 @@ logger.addHandler(file_handler)
 @app.route('/<key>', methods=['GET'])
 def get_value(key):
     with lock:
-        if key in kv_store:
-            logger.info(f"GET {key} succeeded: Value retrieved")
-            return jsonify({'value': kv_store[key]}), 200
-        else:
-            logger.warning(f"GET {key} failed: Key not found")
-            return jsonify({'error': 'Key not found'}), 404
+        exists = key in kv_store
+        value = kv_store[key] if exists else None
+        
+    if exists:
+        logger.info(f"GET {key} succeeded: Value retrieved")
+        return jsonify({'value': value}), 200
+    else:
+        logger.warning(f"GET {key} failed: Key not found")
+        return jsonify({'error': 'Key not found'}), 404
 
 @app.route('/<key>', methods=['POST', 'PUT'])
 def set_value(key):
@@ -53,13 +56,16 @@ def set_value(key):
 @app.route('/<key>', methods=['DELETE'])
 def delete_value(key):
     with lock:
-        if key in kv_store:
+        exists = key in kv_store
+        if exists:
             del kv_store[key]
-            logger.info(f"DELETE {key} succeeded: Key deleted")
-            return jsonify({'message': 'Key deleted successfully'}), 200
-        else:
-            logger.warning(f"DELETE {key} failed: Key not found")
-            return jsonify({'error': 'Key not found'}), 404
+
+    if exists:
+        logger.info(f"DELETE {key} succeeded: Key deleted")
+        return jsonify({'message': 'Key deleted successfully'}), 200
+    else:
+        logger.warning(f"DELETE {key} failed: Key not found")
+        return jsonify({'error': 'Key not found'}), 404
 
 def load_snapshot():
     if os.path.exists(SNAPSHOT_FILE):
