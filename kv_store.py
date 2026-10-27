@@ -90,4 +90,4 @@ if __name__ == '__main__':
     load_snapshot()
     threading.Thread(target=snapshot_loop, daemon=True).start()
     atexit.register(save_snapshot)
-    app.run(host='127.0.0.1', port=8080, threaded=True)
+    app.run(host='0.0.0.0', port=8080, threaded=True)
