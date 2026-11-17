@@ -8,8 +8,13 @@ import atexit
 
 # The base URL of the Flask server
 BASE_URL = 'http://127.0.0.1:8080'
-SNAPSHOT_FILE = "kv_snapshot.json"
 SNAPSHOT_INTERVAL = 5
+PORT = int(os.environ.get("PORT", "8080"))
+HOST = os.environ.get("HOST", "127.0.0.1")
+DATA_DIR = os.environ.get("DATA_DIR", ".")
+os.makedirs(DATA_DIR, exist_ok=True)
+SNAPSHOT_FILE = os.path.join(DATA_DIR, "kv_snapshot.json")
+LOG_FILE = os.path.join(DATA_DIR, "server.log")
 
 app = Flask(__name__)
 
@@ -20,7 +25,7 @@ logger = logging.getLogger("kv_store")
 logger.setLevel(logging.INFO)
 logger.propagate = False
 
-file_handler = logging.FileHandler("server.log", encoding="utf-8")
+file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
 file_handler.setFormatter(logging.Formatter(
     "%(asctime)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
@@ -90,4 +95,4 @@ if __name__ == '__main__':
     load_snapshot()
     threading.Thread(target=snapshot_loop, daemon=True).start()
     atexit.register(save_snapshot)
-    app.run(host='127.0.0.1', port=8080, threaded=True)
+    app.run(host=HOST, port=PORT, threaded=True)
