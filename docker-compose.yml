@@ -1,0 +1,37 @@
+# One router in front of three storage nodes, all on one compose network.
+# Containers reach each other by service name, for example http://kv1:8080.
+
+x-node: &node
+  build: .
+  healthcheck:
+    test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8080), 2)"]
+    interval: 2s
+    timeout: 3s
+    retries: 15
+
+services:
+  kv1:
+    <<: *node
+    volumes: ["kv1-data:/data"]
+  kv2:
+    <<: *node
+    volumes: ["kv2-data:/data"]
+  kv3:
+    <<: *node
+    volumes: ["kv3-data:/data"]
+
+  router:
+    build: .
+    command: ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "8", "router:app"]
+    environment:
+      BACKENDS: http://kv1:8080,http://kv2:8080,http://kv3:8080
+    ports: ["8080:8080"]
+    depends_on:
+      kv1: {condition: service_healthy}
+      kv2: {condition: service_healthy}
+      kv3: {condition: service_healthy}
+
+volumes:
+  kv1-data:
+  kv2-data:
+  kv3-data:
