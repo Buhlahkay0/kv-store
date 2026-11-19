@@ -22,9 +22,9 @@ services:
 
   router:
     build: .
-    command: ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "2", "--threads", "8", "router:app"]
+    command: ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--threads", "8", "router:app"]
     environment:
-      BACKENDS: http://kv1:8080,http://kv2:8080,http://kv3:8080
+      BACKENDS: ${BACKENDS:-http://kv1:8080,http://kv2:8080,http://kv3:8080}
     ports: ["8080:8080"]
     depends_on:
       kv1: {condition: service_healthy}
