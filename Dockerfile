@@ -3,14 +3,16 @@ FROM python:3.12-alpine
 WORKDIR /app
 
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY kv_store.py .
+COPY kv_store.py router.py ./
 
-# Bind to all interfaces so the server is reachable from outside the container
-RUN sed -i "s/host='127.0.0.1'/host='0.0.0.0'/" kv_store.py
+# Listen on all interfaces so other containers can reach the node.
+ENV HOST=0.0.0.0 \
+    PORT=8080 \
+    DATA_DIR=/data
 
 EXPOSE 8080
 
+# Runs a storage node. The router overrides this command in docker-compose.yml.
 CMD ["python", "kv_store.py"]
