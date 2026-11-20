@@ -107,6 +107,23 @@ Each row is the average of two runs on a freshly started cluster, with 32 reques
 
 From one node to three nodes, SET throughput rose 1.54 times and GET throughput rose 1.79 times. The gain is below 3 times because the router and the benchmark client, which runs on the host machine and reaches Docker through port forwarding, have their own limits.
 
+## Measure again and draw the charts
+
+The measurements in the report are saved in `results/results.csv`, and `plot_results.py` turns that file into two charts, `results/throughput.png` and `results/latency.png`. Charts need matplotlib, which the Docker image doesn't use, so it has its own requirements file.
+
+```bash
+pip install -r requirements-bench.txt
+python plot_results.py
+```
+
+To measure again, start Docker and run `run_benchmarks.py`. For each node count, the script deletes the old cluster and its volumes, starts a new cluster, runs `bench_scaling.py`, and writes the results to a CSV file. A full run (1, 2 and 3 nodes, 2 runs each) takes a few minutes, and the numbers will differ slightly from the report.
+
+```bash
+python run_benchmarks.py                       # writes results/results.csv, which replaces the report data
+python run_benchmarks.py --out new_results.csv # keeps results/results.csv unchanged
+python plot_results.py new_results.csv
+```
+
 ## Limitations
 
 - The router opens a new connection to a node for every request. Closed connections wait in the TIME_WAIT state, and a container has about 28,200 ports available for one destination, so a router that sends more than about 28,000 requests to a single node starts returning 502. With three nodes the limit applies to each node separately.
