@@ -11,7 +11,7 @@ Each node keeps its keys in memory, saves them to `kv_snapshot.json` every 5 sec
 Files:
 - `kv_store.py` is a storage node and `router.py` is the router.
 - `Dockerfile` builds one image with both programs, and `docker-compose.yml` starts three nodes and the router.
-- `kv_bench.py` is the provided benchmark and isn't modified. `bench_scaling.py` runs it from several processes, `run_benchmarks.py` measures 1, 2 and 3 nodes, and `plot_results.py` draws charts and table images from a results file.
+- `kv_bench.py` is the provided benchmark and isn't modified. `bench_scaling.py` runs it from several processes, `run_benchmarks.py` measures 1, 2 and 3 nodes, and `plot_results.py` draws charts from `results/`.
 - `requirements.txt` is for the cluster, and `requirements-bench.txt` is for the charts.
 
 ## Setup
@@ -91,12 +91,12 @@ To measure again, start Docker and run `run_benchmarks.py`. For each node count,
 pip install -r requirements-bench.txt
 python run_benchmarks.py                        # writes results/results.csv, which replaces the report data
 python run_benchmarks.py --out new_results.csv  # keeps results/results.csv unchanged
-python plot_results.py new_results.csv          # writes 6 PNG files to a figures folder next to the CSV
+python plot_results.py new_results.csv          # writes throughput.png and latency.png next to the CSV
 ```
 
 ## Results
 
-Each row is the average of two runs on a freshly started cluster, with 32 requests in flight and no errors. The report data is in `results/results.csv`, and its charts and table images are in `results/figures/`.
+Each row is the average of two runs on a freshly started cluster, with 32 requests in flight and no errors. The report data and its charts are in `results/`.
 
 | Nodes | SET ops/s | GET ops/s | SET avg / p99 latency | GET avg / p99 latency |
 |-------|-----------|-----------|-----------------------|-----------------------|
