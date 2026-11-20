@@ -15,6 +15,9 @@ Files:
 - `docker-compose.yml` starts three nodes and the router together.
 - `kv_bench.py` is the provided benchmark, and it is not modified.
 - `bench_scaling.py` runs the same benchmark with several client processes, to produce heavier load.
+- `run_benchmarks.py` measures 1, 2 and 3 nodes on fresh clusters and writes a CSV file, and `plot_results.py` draws charts from that file.
+- `requirements.txt` lists what the nodes and router need, and `requirements-bench.txt` lists matplotlib for the charts.
+- `results/` holds the measurements from the report and the charts drawn from them.
 
 ## Setup
 
@@ -53,6 +56,8 @@ PORT=9002 DATA_DIR=data2 python kv_store.py &
 PORT=9003 DATA_DIR=data3 python kv_store.py &
 BACKENDS=http://127.0.0.1:9001,http://127.0.0.1:9002,http://127.0.0.1:9003 python router.py
 ```
+
+Stop the router with Ctrl+C, and stop the background nodes with `pkill -f kv_store.py`.
 
 A node reads three environment variables. `PORT` defaults to 8080, `HOST` defaults to 127.0.0.1, and `DATA_DIR` defaults to the current directory. The Docker image sets `HOST=0.0.0.0` and `DATA_DIR=/data`.
 
@@ -127,7 +132,7 @@ python plot_results.py new_results.csv
 ## Limitations
 
 - The router opens a new connection to a node for every request. Closed connections wait in the TIME_WAIT state, and a container has about 28,200 ports available for one destination, so a router that sends more than about 28,000 requests to a single node starts returning 502. With three nodes the limit applies to each node separately.
-- When the list of nodes changes, the router uses the new ring right away, but the keys that now belong to a different node aren't moved. Those keys read as missing until they're written again.
+- When the list of nodes changes, the router uses the new ring right away, but the keys that now belong to a different node aren't moved. Such keys read as missing until they're written again.
 - Each key is stored on one node only, so a node that goes down makes its keys unavailable.
 
 ## Assumptions
