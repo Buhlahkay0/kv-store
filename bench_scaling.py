@@ -21,9 +21,12 @@ def run(phase):
     latencies = sorted(lat for lats, _ in results for lat in lats)
     elapsed = max(t for _, t in results)
     ok = len(latencies)
-    print(f"{phase.upper()}: ok={ok} throughput={ok / elapsed:.0f} ops/s "
-          f"avg={1e3 * sum(latencies) / ok:.2f} ms "
-          f"p99={1e3 * latencies[int(0.99 * (ok - 1))]:.2f} ms")
+    ops = ok / elapsed
+    avg_ms = 1e3 * sum(latencies) / ok
+    p99_ms = 1e3 * latencies[int(0.99 * (ok - 1))]
+    print(f"{phase.upper()}: ok={ok} throughput={ops:.0f} ops/s "
+          f"avg={avg_ms:.2f} ms p99={p99_ms:.2f} ms")
+    return {"ok": ok, "ops_per_s": ops, "avg_ms": avg_ms, "p99_ms": p99_ms}
 
 
 if __name__ == "__main__":
