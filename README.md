@@ -1,23 +1,18 @@
 # Distributed key-value store
 
-A key-value store served over HTTP, built with Python and Flask. A router spreads the keys across one to three storage nodes using consistent hashing, and every node runs in its own Docker container. Each node supports GET, PUT and DELETE, handles concurrent requests, logs every operation, and saves its data to disk.
+A key-value store served over HTTP with Python and Flask. A router spreads the keys across one to three storage nodes using consistent hashing, and each node runs in its own Docker container.
 
 ## How it works
 
-Clients send every request to the router on port 8080, and the router never stores data itself. For each key, the router asks a consistent hash ring (the uhashring library, with 160 virtual nodes per node) which node owns the key. It then forwards the request to that node and returns the node's answer unchanged. The same key always goes to the same node, and adding or removing a node changes the owner of only about 1/N of the keys.
+Clients send every request to the router on port 8080. For each key, the router asks a consistent hash ring (the uhashring library, with 160 virtual nodes per node) which node owns the key, forwards the request to that node, and returns the node's answer unchanged. The same key always reaches the same node, and adding or removing a node changes the owner of only about 1/N of the keys. The router answers 502 when the owning node can't be reached and 503 when no nodes are configured.
 
-The router answers 502 when the node that owns a key can't be reached, and 503 when no nodes are configured.
+Each node keeps its keys in memory, saves them to `kv_snapshot.json` every 5 seconds and on shutdown, reloads that file when it starts, and logs every operation to `server.log`. Both files are in the node's `DATA_DIR`.
 
 Files:
-- `kv_store.py` is one storage node.
-- `router.py` is the router.
-- `Dockerfile` builds one image that contains both programs.
-- `docker-compose.yml` starts three nodes and the router together.
-- `kv_bench.py` is the provided benchmark, and it is not modified.
-- `bench_scaling.py` runs the same benchmark with several client processes, to produce heavier load.
-- `run_benchmarks.py` measures 1, 2 and 3 nodes on fresh clusters and writes a CSV file, and `plot_results.py` draws charts from that file.
-- `requirements.txt` lists what the nodes and router need, and `requirements-bench.txt` lists matplotlib for the charts.
-- `results/` holds the measurements from the report and the charts drawn from them.
+- `kv_store.py` is a storage node and `router.py` is the router.
+- `Dockerfile` builds one image with both programs, and `docker-compose.yml` starts three nodes and the router.
+- `kv_bench.py` is the provided benchmark and isn't modified. `bench_scaling.py` runs it from several processes, `run_benchmarks.py` measures 1, 2 and 3 nodes, and `plot_results.py` draws charts from `results/`.
+- `requirements.txt` is for the cluster, and `requirements-bench.txt` is for the charts.
 
 ## Setup
 
@@ -29,26 +24,26 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Run the cluster with Docker
+## Run with Docker
 
 ```bash
 docker compose up --build --wait
 ```
 
-The command starts three nodes and the router. The router starts only after all three nodes pass their health check. The router is reachable at http://localhost:8080, and the nodes are only reachable from inside the compose network.
+The command starts three nodes and the router, and the router waits until all three nodes pass their health check. The router is at http://localhost:8080, and the nodes are reachable only inside the compose network.
 
 To use fewer nodes, set `BACKENDS` to the nodes the router should use. All three containers still start, but the router sends keys only to the nodes in the list.
 
 ```bash
-BACKENDS=http://kv1:8080 docker compose up --build --wait                       # 1 node
-BACKENDS=http://kv1:8080,http://kv2:8080 docker compose up --build --wait       # 2 nodes
+BACKENDS=http://kv1:8080 docker compose up --build --wait                 # 1 node
+BACKENDS=http://kv1:8080,http://kv2:8080 docker compose up --build --wait # 2 nodes
 ```
 
-To stop the cluster, run `docker compose down`. Each node keeps its data in a named volume, so the data survives this command. Add `-v` to delete the volumes as well. A node can lose up to 5 seconds of recent writes when it is stopped, because the final snapshot isn't guaranteed.
+To stop the cluster, run `docker compose down`, which keeps each node's named volume. Add `-v` to delete the volumes too. A node can lose up to 5 seconds of writes when it is stopped, because the final snapshot isn't guaranteed.
 
 ## Run without Docker
 
-Start each node with its own port and data directory, and then start the router.
+Start each node with its own port and data directory, and then start the router. Stop the router with Ctrl+C and the nodes with `pkill -f kv_store.py`.
 
 ```bash
 PORT=9001 DATA_DIR=data1 python kv_store.py &
@@ -57,9 +52,7 @@ PORT=9003 DATA_DIR=data3 python kv_store.py &
 BACKENDS=http://127.0.0.1:9001,http://127.0.0.1:9002,http://127.0.0.1:9003 python router.py
 ```
 
-Stop the router with Ctrl+C, and stop the background nodes with `pkill -f kv_store.py`.
-
-A node reads three environment variables. `PORT` defaults to 8080, `HOST` defaults to 127.0.0.1, and `DATA_DIR` defaults to the current directory. The Docker image sets `HOST=0.0.0.0` and `DATA_DIR=/data`.
+A node reads `PORT` (default 8080), `HOST` (default 127.0.0.1) and `DATA_DIR` (default the current directory). The Docker image sets `HOST=0.0.0.0` and `DATA_DIR=/data`.
 
 ## API
 
@@ -76,11 +69,7 @@ curl -X DELETE localhost:8080/greeting
 curl -i localhost:8080/greeting     # 404 after deletion
 ```
 
-## Persistence and logging
-
-Each node saves its keys to `kv_snapshot.json` every 5 seconds and when it shuts down, and it reloads that file when it starts. Each node also writes every operation with a timestamp to `server.log`. Both files are in the node's `DATA_DIR`.
-
-## Benchmark
+## Benchmarks
 
 The provided benchmark runs against the router at http://127.0.0.1:8080.
 
@@ -90,19 +79,24 @@ python kv_bench.py set      # write only
 python kv_bench.py get      # verify only
 ```
 
-The provided benchmark sends only 300 requests from 3 threads, which is too little load to show a difference between one and three nodes. `bench_scaling.py` imports `kv_bench`, changes its settings, and runs it in several processes at the same time.
+The provided benchmark sends only 300 requests from 3 threads, which is too little load to show a difference between one and three nodes. `bench_scaling.py` imports `kv_bench`, changes its settings, and runs it in 4 processes of 8 threads each with 3,000 keys per process, so each phase makes 12,000 requests.
 
 ```bash
 python bench_scaling.py
 ```
 
-The settings are at the top of the file. The defaults are 4 processes with 8 threads each and 3,000 keys per process, which makes 12,000 requests per phase.
+To measure again, start Docker and run `run_benchmarks.py`. For each node count, it deletes the old cluster and its volumes, starts a new cluster, runs `bench_scaling.py`, and writes a CSV file. It needs a new cluster for every run because of the router limit described below. A full run takes a few minutes, and the numbers will differ slightly from the report. Charts need matplotlib, which the Docker image doesn't use.
 
-To compare node counts, restart the cluster before every measured run (`docker compose down -v`, then start it with the `BACKENDS` value you want), because of the router limit described below.
+```bash
+pip install -r requirements-bench.txt
+python run_benchmarks.py                        # writes results/results.csv, which replaces the report data
+python run_benchmarks.py --out new_results.csv  # keeps results/results.csv unchanged
+python plot_results.py new_results.csv          # writes throughput.png and latency.png next to the CSV
+```
 
 ## Results
 
-Each row is the average of two runs on a freshly started cluster, with 32 requests in flight and no errors.
+Each row is the average of two runs on a freshly started cluster, with 32 requests in flight and no errors. The report data and its charts are in `results/`.
 
 | Nodes | SET ops/s | GET ops/s | SET avg / p99 latency | GET avg / p99 latency |
 |-------|-----------|-----------|-----------------------|-----------------------|
@@ -110,29 +104,12 @@ Each row is the average of two runs on a freshly started cluster, with 32 reques
 | 2 | 2,133 | 2,296 | 14.9 / 29.5 ms | 13.8 / 26.6 ms |
 | 3 | 2,695 | 2,902 | 11.7 / 24.5 ms | 10.8 / 22.0 ms |
 
-From one node to three nodes, SET throughput rose 1.54 times and GET throughput rose 1.79 times. The gain is below 3 times because the router and the benchmark client, which runs on the host machine and reaches Docker through port forwarding, have their own limits.
-
-## Measure again and draw the charts
-
-The measurements in the report are saved in `results/results.csv`, and `plot_results.py` turns that file into two charts, `results/throughput.png` and `results/latency.png`. Charts need matplotlib, which the Docker image doesn't use, so it has its own requirements file.
-
-```bash
-pip install -r requirements-bench.txt
-python plot_results.py
-```
-
-To measure again, start Docker and run `run_benchmarks.py`. For each node count, the script deletes the old cluster and its volumes, starts a new cluster, runs `bench_scaling.py`, and writes the results to a CSV file. A full run (1, 2 and 3 nodes, 2 runs each) takes a few minutes, and the numbers will differ slightly from the report.
-
-```bash
-python run_benchmarks.py                       # writes results/results.csv, which replaces the report data
-python run_benchmarks.py --out new_results.csv # keeps results/results.csv unchanged
-python plot_results.py new_results.csv
-```
+From one node to three nodes, SET throughput rose 1.54 times and GET throughput rose 1.79 times. The gain is below 3 times because the router and the benchmark client, which reaches Docker through port forwarding, have their own limits.
 
 ## Limitations
 
-- The router opens a new connection to a node for every request. Closed connections wait in the TIME_WAIT state, and a container has about 28,200 ports available for one destination, so a router that sends more than about 28,000 requests to a single node starts returning 502. With three nodes the limit applies to each node separately.
-- When the list of nodes changes, the router uses the new ring right away, but the keys that now belong to a different node aren't moved. Such keys read as missing until they're written again.
+- The router opens a new connection to a node for every request, and closed connections wait in the TIME_WAIT state. A container has about 28,200 ports for one destination, so a router that sends more than about 28,000 requests to one node starts returning 502.
+- When the node list changes, the router uses the new ring right away, but keys that now belong to a different node aren't moved. Such keys read as missing until they're written again.
 - Each key is stored on one node only, so a node that goes down makes its keys unavailable.
 
 ## Assumptions
